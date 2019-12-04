@@ -1,0 +1,12 @@
+[Unit]
+Description = TB Gateway Serial Write Service
+After = rc.local.service
+
+[Service]
+Type = simple
+User = root
+Group = root
+ExecStart = /usr/bin/python /root/yzy/GPIO/arduino_demo/arduino-dlln33-tb-gateway/tb-gateway/serial_write_direct.py
+
+[Install]
+WantedBy = multi-user.target
