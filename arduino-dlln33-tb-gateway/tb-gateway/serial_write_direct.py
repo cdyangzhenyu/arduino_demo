@@ -16,7 +16,7 @@ logger.addHandler(handler)
 
 # 打开串口
 ser = serial.Serial("/dev/ttyAMA0", 9600)
-MQTT_HOST = "TB-SERVER-IP"
+MQTT_HOST = "183.230.19.244"
 MQTT_PORT = 31883
 #ACCESS_TOKEN = "UvgTskD2dinGvjY74NME"
 ACCESS_TOKEN = "7bws3uxIQzXZutKiH0Xq"
@@ -74,15 +74,19 @@ def parse_zigbee_data(data):
         'ctl_type': 'led'
     }
     '''
-    dst_port = '90'
+    app_ports = {'led': '90', 'cam_h': '91', 'cam_v': '92'}
+    dst_port = app_ports[data['ctl_type']]
     src_port = '91'
     dst_addr = data['device_id'].split('-')[1]
     dst_addr = dst_addr[2:4]+dst_addr[0:2]
-    if isinstance(data['data'], bool):
-        data['data'] = binascii.b2a_hex(chr(int(data['data'])))
+    logger.info(dst_addr)
+    #if isinstance(data['data'], bool):
+    data['data'] = binascii.b2a_hex(chr(int(data['data'])))
     zb_pkg = src_port+dst_port+dst_addr+data['data']
+    logger.info(zb_pkg)
     pkg_len = binascii.b2a_hex(chr(len(binascii.a2b_hex(zb_pkg))))
     zb_pkg = 'FE%s%sFF'%(pkg_len, zb_pkg)
+    logger.info(zb_pkg)
     return binascii.a2b_hex(zb_pkg)
 
 def on_message(client, userdata, msg):
@@ -100,12 +104,45 @@ def on_message(client, userdata, msg):
         ser_data = parse_zigbee_data(publish_data)
         logger.info(binascii.b2a_hex(ser_data))
         ser.write(ser_data)
-
     elif data['method'] == 'getLedStatus':
         publish_data = json.dumps({"params": True})
         logger.info(data)
         client.publish(msg.topic.replace('request', 'response'), publish_data, 0)
         logger.info("get led status success!")
+    elif data['method'] == 'getHCamAngle':
+        publish_data = json.dumps({"params": "30.00"})
+        logger.info(data)
+        client.publish(msg.topic.replace('request', 'response'), publish_data, 0)
+        logger.info("get camera h angle success!")
+    elif data['method'] == 'setHCamAngle':
+        publish_data = {
+         'device_id': 'SN-0002',
+         'data': str(int(data['params'].split('.')[0])),
+         'ctl_type': 'cam_h'
+        }
+        logger.info("set camera h angle success!")
+        #client.publish('v1/devices/me/attributes', json.dumps({"led": data['params']}), 0)
+        client.publish(msg.topic.replace('request', 'response'), json.dumps({"params": data['params']}), 0)
+        ser_data = parse_zigbee_data(publish_data)
+        logger.info(binascii.b2a_hex(ser_data))
+        ser.write(ser_data)
+    elif data['method'] == 'setVCamAngle':
+        publish_data = {
+         'device_id': 'SN-0002',
+         'data': str(int(data['params'].split('.')[0])),
+         'ctl_type': 'cam_v'
+        }
+        logger.info("set camera v angle success!")
+        #client.publish('v1/devices/me/attributes', json.dumps({"led": data['params']}), 0)
+        client.publish(msg.topic.replace('request', 'response'), json.dumps({"params": data['params']}), 0)
+        ser_data = parse_zigbee_data(publish_data)
+        logger.info(binascii.b2a_hex(ser_data))
+        ser.write(ser_data)
+    elif data['method'] == 'getVCamAngle':
+        publish_data = json.dumps({"params": "30.00"})
+        logger.info(data)
+        client.publish(msg.topic.replace('request', 'response'), publish_data, 0)
+        logger.info("get camera v angle success!")
 
 def on_connect(client, userdata, rc, *extra_params):
     logger.info('Connected with result code ' + str(rc))

@@ -1,5 +1,6 @@
 #include "DHT.h"
 #include "SoftwareSerial.h"
+#include <Servo.h>
 
 // DHT
 #define DHTPIN 3
@@ -35,6 +36,10 @@ unsigned char queue[100] = {};
 int queue_offset = 0;
 bool write_lock = false;
 unsigned long lastSend;
+int cam_h_servo = 12;
+int cam_v_servo = 13;
+int cam_v_pos = 0;
+int cam_h_pos = 0;
 
 void setup() {
   Serial.begin(9600); //USB serial port
@@ -45,6 +50,12 @@ void setup() {
   pinMode(Trig, OUTPUT);  //ceju
   pinMode(Echo, INPUT);   //ceju
   pinMode(pirPin, INPUT); //hongwai
+  pinMode(cam_h_servo,OUTPUT);
+  pinMode(cam_v_servo,OUTPUT);
+  /*
+  cam_h_servo.attach(12);  
+  cam_v_servo.attach(13);
+  cam_v_servo.write(0);*/
 }
 
 void loop() {
@@ -53,13 +64,35 @@ void loop() {
     send_wrap_pkg();
     lastSend = millis();
   }
-  
   if(ledStatus == 1){
     digitalWrite(ledPin, HIGH); 
   }
   else {
     digitalWrite(ledPin, LOW); 
   }
+
+  if(cam_v_pos>0&cam_v_pos<=9)
+  {
+    servoControl(cam_v_servo, cam_v_pos);
+    cam_v_pos = 0;
+  }
+  if(cam_h_pos>0&cam_h_pos<=9)
+  {
+    servoControl(cam_h_servo, cam_h_pos);
+    cam_h_pos = 0;
+  }
+  /*
+  c_cam_v_pos = cam_v_servo.read();
+  if(cam_v_pos > 0 & cam_v_pos != c_cam_v_pos){
+    cam_v_servo.write(cam_v_pos); 
+  }
+  c_cam_h_pos = cam_h_servo.read();
+  if(cam_h_pos > 0 & cam_h_pos != c_cam_h_pos){
+    Serial.print("CAM H POS: ");
+    Serial.println(cam_h_pos);
+    cam_h_servo.write(cam_h_pos); 
+    delay(20); 
+  }*/
   unpackDataAndControl();
 }
 
@@ -100,6 +133,30 @@ void controlAction()
     Serial.print("ledStatus: ");
     Serial.println(int(queue[DLLN3X_PREFIX_LEN]));
     setLedData(int(queue[DLLN3X_PREFIX_LEN]));
+  }
+  // cam h control
+  if(queue[3] == 0x91) {
+    // led control
+    Serial.print("Cam H angle: ");
+    Serial.println(int(queue[DLLN3X_PREFIX_LEN]));
+    setCamData(1, int(queue[DLLN3X_PREFIX_LEN]));
+  }
+  // cam v control
+  if(queue[3] == 0x92) {
+    // led control
+    Serial.print("Cam V angle: ");
+    Serial.println(int(queue[DLLN3X_PREFIX_LEN]));
+    setCamData(0, int(queue[DLLN3X_PREFIX_LEN]));
+  }
+}
+
+void setCamData(int f, int s)
+{
+  if(f == 0) {
+    cam_v_pos = s;
+  }
+  if(f == 1) {
+    cam_h_pos = s;
   }
 }
 
@@ -299,5 +356,26 @@ void parseUartPackage(char *p , int len) {
   if(checkCRC(p,len) ==false){
       Serial.println("check crc error!");
       return;
+  }
+}
+
+void servoPulse(int sp,int val)//定义一个脉冲函数
+{
+  int angle=map(val,0,180,500,2480);
+  digitalWrite(sp,HIGH);//将舵机接口电平至高
+  delayMicroseconds(angle);//延时脉宽值的微秒数
+  digitalWrite(sp,LOW);//将舵机接口电平至低
+  delay(20-val/1000);
+}
+
+void servoControl(int sp, int val)
+{
+  if(val>0&&val<=9)
+  {
+    val=map(val,0,9,0,180);//将角度转化为500-2480的脉宽值
+    for(int i=0;i<=50;i++)//给予舵机足够的时间让它转到指定角度
+    {
+      servoPulse(sp,val);//引用脉冲函数
+    }
   }
 }
